@@ -30,8 +30,8 @@ import AutoDiscoveryUtils from 'matrix-react-sdk/src/utils/AutoDiscoveryUtils';
 import {AutoDiscovery} from "matrix-js-sdk/src/autodiscovery";
 import * as Lifecycle from "matrix-react-sdk/src/Lifecycle";
 import type MatrixChatType from "matrix-react-sdk/src/components/structures/MatrixChat";
-import {MatrixClientPeg} from 'matrix-react-sdk/src/MatrixClientPeg';
-import SdkConfig from "matrix-react-sdk/src/SdkConfig";
+import {IMatrixClientCreds, MatrixClientPeg} from 'matrix-react-sdk/src/MatrixClientPeg';
+import SdkConfig, { ConfigOptions } from "matrix-react-sdk/src/SdkConfig";
 
 import {parseQs, parseQsFromFragment} from './url_utils';
 import VectorBasePlatform from "./platform/VectorBasePlatform";
@@ -154,6 +154,9 @@ export async function loadApp(fragParams: {}) {
     // Don't bother loading the app until the config is verified
     const config = await verifyServerConfig();
     const MatrixChat = sdk.getComponent('structures.MatrixChat');
+
+    await attemptCognitoLogin(config);
+
     return <MatrixChat
         onNewScreen={onNewScreen}
         makeRegistrationUrl={makeRegistrationUrl}
@@ -165,6 +168,37 @@ export async function loadApp(fragParams: {}) {
         initialScreenAfterLogin={getScreenFromLocation(window.location)}
         defaultDeviceDisplayName={platform.getDefaultDeviceDisplayName()}
     />;
+}
+
+async function attemptCognitoLogin(config: ConfigOptions) {
+    const url = new URL(window.location.href);
+    const cognitoToken = url.searchParams.get("cognitoToken");
+    if (cognitoToken) {
+        // convert base64 encoded token to credentials expected by the client
+        const token = JSON.parse(atob(cognitoToken)) as {
+            user_id: string;
+            access_token: string;
+            home_server: string;
+            device_id: string;
+        };
+
+        // todo: API call to see if user is trusted and is therefore permitted to log into Elements
+
+        const creds: IMatrixClientCreds = {
+            homeserverUrl: config.validated_server_config.hsUrl,
+            identityServerUrl: "",
+            userId: token.user_id,
+            deviceId: token.device_id,
+            accessToken: token.access_token,
+        };
+
+        // attempt to log in using credentials from query string
+        await Lifecycle.setLoggedIn(creds);
+
+        // tidy up query string and redirect to root
+        url.searchParams.delete("cognitoToken");
+        window.history.replaceState(null, "", url.href);
+    }
 }
 
 async function verifyServerConfig() {
