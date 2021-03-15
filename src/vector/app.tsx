@@ -155,7 +155,11 @@ export async function loadApp(fragParams: {}) {
     const config = await verifyServerConfig();
     const MatrixChat = sdk.getComponent('structures.MatrixChat');
 
+    // attempt to login with Cognito token
     await attemptCognitoLogin(config);
+
+    // display room view only based on query string
+    config.roomOnlyView = params.roomOnly === "true"; 
 
     return <MatrixChat
         onNewScreen={onNewScreen}
