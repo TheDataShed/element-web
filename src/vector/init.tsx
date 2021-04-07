@@ -34,6 +34,7 @@ import SdkConfig from "matrix-react-sdk/src/SdkConfig";
 import {setTheme} from "matrix-react-sdk/src/theme";
 
 import {initRageshake, initRageshakeStore} from "./rageshakesetup";
+import { parseQs } from "./url_utils";
 
 
 export const rageshakePromise = initRageshake();
@@ -105,7 +106,10 @@ export function loadOlm(): Promise<void> {
 }
 
 export async function loadLanguage() {
-    const prefLang = SettingsStore.getValue("language", null, /*excludeDefault=*/true);
+    // attempt to retrieve language from URL instead of settings store
+    const { language } = parseQs(window.location) || {};
+
+    const prefLang = language || SettingsStore.getValue("language", null, /*excludeDefault=*/true);
     let langs = [];
 
     if (!prefLang) {
